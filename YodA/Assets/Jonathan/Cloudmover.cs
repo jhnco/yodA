@@ -18,16 +18,5 @@ public class CloudMover : MonoBehaviour
     void Update()
     {
         transform.position += Vector3.right * speed * Time.deltaTime;
-
-        if (!wrapAround) return;
-
-        if (speed > 0 && transform.position.x > resetXRight)
-        {
-            transform.position = new Vector3(resetXLeft, transform.position.y, transform.position.z);
-        }
-        else if (speed < 0 && transform.position.x < resetXLeft)
-        {
-            transform.position = new Vector3(resetXRight, transform.position.y, transform.position.z);
-        }
     }
 }
