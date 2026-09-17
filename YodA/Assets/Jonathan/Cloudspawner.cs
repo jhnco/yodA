@@ -4,7 +4,7 @@ using System.Collections.Generic;
 // Spawns clouds made out of several overlapping circles (using CircleCollider-free
 // simple circle sprites drawn at runtime via a small mesh, or you can swap in your own sprite).
 // Attach this to an empty GameObject in the scene.
-public class CloudSpawner : MonoBehaviour
+public class Cloudspawner : MonoBehaviour
 {
     [Header("Spawn Settings")]
     [Tooltip("How many clouds to spawn.")]
