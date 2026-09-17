@@ -43,6 +43,8 @@ public class Cloudspawner : MonoBehaviour
     [Tooltip("Optional material (with whatever shader you want, e.g. a Particle/Additive shader) to apply to the cloud circles. Leave empty to use the default Sprite material.")]
     public Material cloudMaterial;
 
+    public LayerMask cloudLayer;
+
     private float timer;
     private List<GameObject> activeClouds = new List<GameObject>();
 
@@ -62,21 +64,17 @@ public class Cloudspawner : MonoBehaviour
         timer += Time.deltaTime;
         if (timer >= spawnInterval)
         {
-            // Clear out any clouds that were destroyed some other way (e.g. manually, or by a future "pop" effect)
+            timer = 0f;
+
+            // Clear out any clouds that were destroyed by colliding with a CloudDestroyer
             activeClouds.RemoveAll(c => c == null);
 
-            if (activeClouds.Count >= cloudCount)
+            // Only spawn into a free slot. Clouds are no longer force-destroyed by time/cap -
+            // they only go away when CloudDestructible detects a "CloudDestroyer" collision.
+            if (activeClouds.Count < cloudCount)
             {
-                // Recycle the oldest cloud instead of endlessly growing the count or refusing to spawn.
-                // This is what lets new clouds keep appearing at the spawner's *current* position
-                // even after the cap has been reached (e.g. after you move the spawner).
-                GameObject oldest = activeClouds[0];
-                activeClouds.RemoveAt(0);
-                if (oldest != null) Destroy(oldest);
+                SpawnCloud();
             }
-
-            timer = 0f;
-            SpawnCloud();
         }
     }
 
@@ -89,6 +87,8 @@ public class Cloudspawner : MonoBehaviour
         );
 
         GameObject cloud = new GameObject("Cloud");
+        cloud.tag = "Cloud";
+        cloud.layer = 7;
         cloud.transform.position = spawnPos;
         activeClouds.Add(cloud);
 

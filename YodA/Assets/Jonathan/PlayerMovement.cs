@@ -1,187 +1,106 @@
 using UnityEngine;
-using System.Collections.Generic;
 
-// Spawns clouds made out of several overlapping circles (using CircleCollider-free
-// simple circle sprites drawn at runtime via a small mesh, or you can swap in your own sprite).
-// Attach this to an empty GameObject in the scene.
-public class CloudSpawner : MonoBehaviour
+public class PlayerMovement : MonoBehaviour
 {
-    [Header("Spawn Settings")]
-    [Tooltip("How many clouds to spawn.")]
-    public int cloudCount = 5;
+    public float moveSpeed = 5f;
+    public float jumpForce = 8f;
 
-    [Tooltip("Time between spawns in seconds (0 = spawn all at start).")]
-    public float spawnInterval = 2f;
+    [Header("Ground Check (Raycast)")]
+    [Tooltip("Layer(s) considered ground. Set this to your Floor layer, not the Floor tag.")]
+    public LayerMask groundLayer;
+    public LayerMask cloudLayer;
 
-    [Tooltip("How far clouds can spawn from this GameObject's position, on each axis (+/-).")]
-    public Vector2 spawnRange = new Vector2(10f, 3f);
 
-    [Header("Cloud Shape Settings")]
-    [Tooltip("Min/Max number of circles per cloud.")]
-    public int minCirclesPerCloud = 4;
-    public int maxCirclesPerCloud = 7;
+    [Tooltip("How far below the player's feet to check for ground.")]
+    public float groundCheckDistance = 0.15f;
 
-    [Tooltip("Min/Max radius of each circle.")]
-    public float minCircleRadius = 0.5f;
-    public float maxCircleRadius = 1.2f;
+    [Tooltip("Optional: assign an empty child GameObject placed at the player's feet. If left empty, the collider's bottom edge is used instead.")]
+    public Transform groundCheckPoint;
 
-    [Tooltip("How spread out the circles are within a cloud.")]
-    public float spreadX = 1.5f;
-    public float spreadY = 0.6f;
+    [Tooltip("Small grace window (seconds) after walking off a ledge where jumping is still allowed.")]
+    public float coyoteTime = 0.1f;
 
-    [Header("Movement (optional)")]
-    [Tooltip("If true, adds a CloudMover component to each spawned cloud.")]
-    public bool addMover = true;
-    public float moveSpeedMin = 0.3f;
-    public float moveSpeedMax = 1f;
-
-    [Header("Appearance")]
-    public Color cloudColor = Color.white;
-    [Tooltip("Sorting order for the circle sprites.")]
-    public int sortingOrder = 0;
-
-    [Tooltip("Optional material (with whatever shader you want, e.g. a Particle/Additive shader) to apply to the cloud circles. Leave empty to use the default Sprite material.")]
-    public Material cloudMaterial;
-
-    private float timer;
-    private List<GameObject> activeClouds = new List<GameObject>();
+    private Rigidbody2D rb;
+    private Collider2D col;
+    private bool isGrounded;
+    private float coyoteTimer;
 
     void Start()
     {
-        if (spawnInterval <= 0f)
-        {
-            for (int i = 0; i < cloudCount; i++)
-                SpawnCloud(); // SpawnCloud() already adds each cloud to activeClouds
-        }
+        rb = GetComponent<Rigidbody2D>();
+        col = GetComponent<Collider2D>();
     }
 
     void Update()
     {
-        if (spawnInterval <= 0f) return;
+        CheckGrounded();
 
-        timer += Time.deltaTime;
-        if (timer >= spawnInterval)
+        // Walking
+        float moveInput = Input.GetAxisRaw("Horizontal");
+        rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
+
+        // Coyote time: keep a short window where jumping is still allowed
+        // right after leaving the ground (e.g. walking off a ledge).
+        if (isGrounded)
         {
-            // Clear out any clouds that were destroyed some other way (e.g. manually, or by a future "pop" effect)
-            activeClouds.RemoveAll(c => c == null);
+            coyoteTimer = coyoteTime;
+        }
+        else
+        {
+            coyoteTimer -= Time.deltaTime;
+        }
 
-            if (activeClouds.Count >= cloudCount)
-            {
-                // Recycle the oldest cloud instead of endlessly growing the count or refusing to spawn.
-                // This is what lets new clouds keep appearing at the spawner's *current* position
-                // even after the cap has been reached (e.g. after you move the spawner).
-                GameObject oldest = activeClouds[0];
-                activeClouds.RemoveAt(0);
-                if (oldest != null) Destroy(oldest);
-            }
-
-            timer = 0f;
-            SpawnCloud();
+        // Jumping
+        if (Input.GetButtonDown("Jump") && coyoteTimer > 0f)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            coyoteTimer = 0f; // prevent double-jumping during the same grace window
         }
     }
 
-    void SpawnCloud()
+    void CheckGrounded()
     {
-        Vector3 spawnPos = transform.position + new Vector3(
-            Random.Range(-spawnRange.x, spawnRange.x),
-            Random.Range(-spawnRange.y, spawnRange.y),
-            0f
-        );
+        Vector2 origin;
 
-        GameObject cloud = new GameObject("Cloud");
-        cloud.transform.position = spawnPos;
-        activeClouds.Add(cloud);
-
-        int circleCount = Random.Range(minCirclesPerCloud, maxCirclesPerCloud + 1);
-
-        for (int i = 0; i < circleCount; i++)
+        if (groundCheckPoint != null)
         {
-            CreateCirclePart(cloud.transform, i);
+            origin = groundCheckPoint.position;
+        }
+        else if (col != null)
+        {
+            // Fall back to the bottom-center of the collider's bounds if no groundCheckPoint is set.
+            origin = new Vector2(col.bounds.center.x, col.bounds.min.y);
+        }
+        else
+        {
+            origin = transform.position;
         }
 
-        // Kinematic Rigidbody2D so trigger events fire reliably even if the
-        // CloudDestroyer-tagged object doesn't have its own Rigidbody2D.
-        Rigidbody2D rb = cloud.AddComponent<Rigidbody2D>();
-        rb.bodyType = RigidbodyType2D.Kinematic;
-        rb.gravityScale = 0f;
+        RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, groundCheckDistance, groundLayer | cloudLayer);
+        isGrounded = hit.collider != null;
 
-        // Rough trigger radius covering the spread of circles that make up this cloud.
-        CircleCollider2D triggerCollider = cloud.AddComponent<CircleCollider2D>();
-        triggerCollider.isTrigger = true;
-        triggerCollider.radius = Mathf.Max(spreadX, spreadY) + maxCircleRadius;
+        // Uncomment to visualize the ray in the Scene view:
+        // Debug.DrawRay(origin, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
+    }
 
-        cloud.AddComponent<CloudDestructible>();
-
-        if (addMover)
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if(other.gameObject.tag == "Cloud")
         {
-            CloudMover mover = cloud.AddComponent<CloudMover>();
-            mover.speed = Random.Range(moveSpeedMin, moveSpeedMax);
-            mover.resetXLeft = transform.position.x - spawnRange.x - 5f;
-            mover.resetXRight = transform.position.x + spawnRange.x + 5f;
+            Physics2D.gravity = new Vector2(0f, -3f);
         }
     }
 
-    void CreateCirclePart(Transform parent, int index)
+    private void OnTriggerExit2D(Collider2D other)
     {
-        GameObject part = new GameObject("CirclePart_" + index);
-        part.transform.parent = parent;
-
-        // Random offset within the cloud's spread area
-        float offsetX = Random.Range(-spreadX, spreadX);
-        float offsetY = Random.Range(-spreadY, spreadY);
-        part.transform.localPosition = new Vector3(offsetX, offsetY, 0f);
-
-        float radius = Random.Range(minCircleRadius, maxCircleRadius);
-        part.transform.localScale = Vector3.one * radius * 2f;
-
-        SpriteRenderer sr = part.AddComponent<SpriteRenderer>();
-        sr.sprite = GetCircleSprite();
-        sr.color = cloudColor;
-        sr.sortingOrder = sortingOrder;
-
-        if (cloudMaterial != null)
+        if (other.gameObject.tag == "Cloud")
         {
-            // Creates its own material instance (copy of the assigned material) so each
-            // cloud can be tweaked independently at runtime without affecting the shared asset.
-            sr.material = new Material(cloudMaterial);
+            Invoke("ChangeToDefaultGravity", 0.2f);
         }
     }
 
-    // Generates (and caches) a simple white circle sprite at runtime,
-    // so you don't need to import a circle texture yourself.
-    private static Sprite cachedCircleSprite;
-    private Sprite GetCircleSprite()
+    void ChangeToDefaultGravity()
     {
-        if (cachedCircleSprite != null) return cachedCircleSprite;
-
-        int size = 128;
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        Color32[] pixels = new Color32[size * size];
-        Vector2 center = new Vector2(size / 2f, size / 2f);
-        float radius = size / 2f;
-
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float dist = Vector2.Distance(new Vector2(x, y), center);
-                // simple anti-aliased edge
-                float alpha = Mathf.Clamp01(radius - dist);
-                pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha > 0.5f ? 255 : (dist < radius ? 255 : 0)));
-            }
-        }
-
-        tex.SetPixels32(pixels);
-        tex.Apply();
-
-        cachedCircleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size / 2f);
-        return cachedCircleSprite;
-    }
-
-    // Draws the spawn range as a wireframe box in the Scene view when this object is selected.
-    void OnDrawGizmosSelected()
-    {
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireCube(transform.position, new Vector3(spawnRange.x * 2f, spawnRange.y * 2f, 0f));
+        Physics2D.gravity = new Vector2(0f, -9.81f);
     }
 }
