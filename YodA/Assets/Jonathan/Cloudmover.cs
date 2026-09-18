@@ -6,14 +6,6 @@ public class CloudMover : MonoBehaviour
     [Tooltip("Units per second. Positive = move right, Negative = move left.")]
     public float speed = 1f;
 
-    [Tooltip("If true, cloud wraps around to the other side of the screen when it goes off-screen.")]
-    public bool wrapAround = true;
-
-    [Tooltip("X position where cloud resets to if wrapAround is on and it moves off the right edge.")]
-    public float resetXRight = 15f;
-
-    [Tooltip("X position where cloud resets to if wrapAround is on and it moves off the left edge.")]
-    public float resetXLeft = -15f;
 
     void Update()
     {

@@ -7,11 +7,13 @@ using System.Collections.Generic;
 public class Cloudspawner : MonoBehaviour
 {
     [Header("Spawn Settings")]
-    [Tooltip("How many clouds to spawn.")]
-    public int cloudCount = 5;
+    [Tooltip("Min/Max number of clouds to spawn at start (used only when spawnInterval is 0).")]
+    public int minCloudCount = 3;
+    public int maxCloudCount = 5;
 
-    [Tooltip("Time between spawns in seconds (0 = spawn all at start).")]
-    public float spawnInterval = 2f;
+    [Tooltip("Min/Max time between spawns in seconds. A new random value in this range is picked after every spawn.")]
+    public float minSpawnInterval = 1f;
+    public float maxSpawnInterval = 3f;
 
     [Tooltip("How far clouds can spawn from this GameObject's position, on each axis (+/-).")]
     public Vector2 spawnRange = new Vector2(10f, 3f);
@@ -46,35 +48,40 @@ public class Cloudspawner : MonoBehaviour
     public LayerMask cloudLayer;
 
     private float timer;
+    private float currentSpawnInterval;
     private List<GameObject> activeClouds = new List<GameObject>();
 
     void Start()
     {
-        if (spawnInterval <= 0f)
+        currentSpawnInterval = Random.Range(minSpawnInterval, maxSpawnInterval);
+
+        if (currentSpawnInterval <= 0f)
         {
-            for (int i = 0; i < cloudCount; i++)
+            int burstCount = Random.Range(minCloudCount, maxCloudCount + 1);
+            for (int i = 0; i < burstCount; i++)
                 SpawnCloud(); // SpawnCloud() already adds each cloud to activeClouds
         }
     }
 
     void Update()
     {
-        if (spawnInterval <= 0f) return;
+        if (currentSpawnInterval <= 0f) return;
 
         timer += Time.deltaTime;
-        if (timer >= spawnInterval)
+        if (timer >= currentSpawnInterval)
         {
             timer = 0f;
 
-            // Clear out any clouds that were destroyed by colliding with a CloudDestroyer
+            // Clear out any clouds that were destroyed by colliding with a CloudDestroyer.
+            // This is just bookkeeping now - it no longer gates whether we spawn.
             activeClouds.RemoveAll(c => c == null);
 
-            // Only spawn into a free slot. Clouds are no longer force-destroyed by time/cap -
-            // they only go away when CloudDestructible detects a "CloudDestroyer" collision.
-            if (activeClouds.Count < cloudCount)
-            {
-                SpawnCloud();
-            }
+            // Spawn a new cloud every interval, uncapped. Clouds only go away when
+            // CloudDestructible detects a "CloudDestroyer" collision.
+            SpawnCloud();
+
+            // Pick a fresh random interval for the next spawn.
+            currentSpawnInterval = Random.Range(minSpawnInterval, maxSpawnInterval);
         }
     }
 
@@ -116,8 +123,6 @@ public class Cloudspawner : MonoBehaviour
         {
             CloudMover mover = cloud.AddComponent<CloudMover>();
             mover.speed = Random.Range(moveSpeedMin, moveSpeedMax);
-            mover.resetXLeft = transform.position.x - spawnRange.x - 5f;
-            mover.resetXRight = transform.position.x + spawnRange.x + 5f;
         }
     }
 
