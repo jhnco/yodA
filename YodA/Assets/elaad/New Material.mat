@@ -43,7 +43,7 @@ Material:
     m_Floats:
     - _EnableExternalAlpha: 0
     - _MaxY: 1
-    - _MinY: 0
+    - _MinY: -10
     - _Reveal: 0
     - _Soft: 0.5
     - _ZWrite: 0

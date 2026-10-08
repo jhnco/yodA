@@ -111,7 +111,7 @@ public class PlayerMovement : MonoBehaviour
     void CheckCloudContact()
     {
         // Only the player's main collider is tested, so the Leaf Collider child is ignored.
-        int count = col.OverlapCollider(cloudFilter, overlapResults);
+        int count = col.Overlap(cloudFilter, overlapResults);
 
         bool nowTouching = false;
         Collider2D cloudCollider = null;
