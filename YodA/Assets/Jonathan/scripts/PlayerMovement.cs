@@ -3,114 +3,243 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
-    public float moveSpeed = 5f;
-    public float jumpForce = 8f;
+    float accel = 0.1f;
 
-    [Header("Ground Check (Raycast)")]
-    [Tooltip("Layer(s) considered ground. Set this to your Floor layer, not the Floor tag.")]
-    public LayerMask groundLayer;
-    public LayerMask cloudLayer;
+    [SerializeField] float tapJumpSpeed;
+    [SerializeField] float minJumpTime;
+    [SerializeField] float checkGroundRayLength;
+    [SerializeField] LayerMask Floor;
 
-    [Tooltip("How far below the player's feet to check for ground.")]
-    public float groundCheckDistance = 0.15f;
+    [Tooltip("Layer(s) of the clouds. Also counts as ground.")]
+    [SerializeField] LayerMask cloudLayer;
 
-    [Tooltip("Optional: assign an empty child GameObject placed at the player's feet. If left empty, the collider's bottom edge is used instead.")]
-    public Transform groundCheckPoint;
+    [SerializeField] float moveSpeed;
+    [SerializeField] float maxSpeed;
+    public float wantedSpeed;
+    int directon;
+    public float movement;
 
-    [Tooltip("Small grace window (seconds) after walking off a ledge where jumping is still allowed.")]
-    public float coyoteTime = 0.1f;
+    [Header("Walking / Facing")]
+    public bool currentlyWalking = false;
+    public bool facingRight = true;
+
+    [Tooltip("SpriteRenderer to flip. Assign in Inspector or find automatically.")]
+    [SerializeField] SpriteRenderer spriteRenderer;
+
+    [SerializeField] float jumpSpeed;
+    [SerializeField] float jumpDuration;
+    [SerializeField] float maxJump;
+    public bool jumping;
+    public bool grounded;
+    float jumpingStartTime;
+    float jumpVel;
+
+    float lastTimeGrounded;
+    bool wasGrounded;
+
+    [SerializeField] float delayedJumpTimeAllowance;
+
+    public bool allowedMovement = true;
+
+    Vector2 groundBoxSize = new Vector2(0.4f, 0.5f);
 
     [Header("Cloud Triangles")]
-    public Color triangleColor = new Color(0.6f, 0.85f, 1f, 1f);   // light blue
-    [Tooltip("World size of each triangle.")]
+    public Color triangleColor = new Color(0.6f, 0.85f, 1f, 1f);
     public float triangleSize = 0.3f;
-    [Tooltip("Seconds between spawns while touching a cloud.")]
     public float spawnInterval = 0.08f;
-    [Tooltip("How long each triangle lives (seconds).")]
     public float triangleLifetime = 0.6f;
-    [Tooltip("How far each triangle drifts downward over its lifetime.")]
     public float triangleFallDistance = 0.8f;
-    [Tooltip("Left/right wiggle distance.")]
     public float wiggleAmount = 0.08f;
-    [Tooltip("Wiggle speed. Higher = faster shake.")]
     public float wiggleSpeed = 40f;
-    [Tooltip("Random horizontal spread around the player's center.")]
     public float spawnSpread = 0.3f;
 
-    private Rigidbody2D rb;
-    private Collider2D col;
-    private bool isGrounded;
-    private float coyoteTimer;
+    Collider2D col;
+    bool touchingCloud;
+    ContactFilter2D cloudFilter;
+    readonly Collider2D[] overlapResults = new Collider2D[16];
 
-    // Cloud detection (uses only the main collider, so the Leaf Collider child is ignored)
-    private bool touchingCloud;
-    private ContactFilter2D cloudFilter;
-    private readonly Collider2D[] overlapResults = new Collider2D[16];
-
-    private Coroutine triangleRoutine;
-    private static Sprite triangleSprite;
+    Coroutine triangleRoutine;
+    static Sprite triangleSprite;
 
     void Start()
     {
-        rb = GetComponent<Rigidbody2D>();
         col = GetComponent<Collider2D>();
+
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
+        // Set the initial facing direction without rotating the player.
+        if (spriteRenderer != null)
+            spriteRenderer.flipX = !facingRight;
 
         cloudFilter = new ContactFilter2D();
         cloudFilter.NoFilter();
-        cloudFilter.useTriggers = true; // clouds are triggers, so include them
+        cloudFilter.useTriggers = true;
     }
 
     void Update()
     {
-        CheckGrounded();
         CheckCloudContact();
+        CheckDirection();
 
-        // Walking
-        float moveInput = Input.GetAxisRaw("Horizontal");
-        rb.linearVelocity = new Vector2(moveInput * moveSpeed, rb.linearVelocity.y);
+        if (allowedMovement)
+            Jump();
+    }
 
-        // Coyote time
-        if (isGrounded)
+    void FixedUpdate()
+    {
+        checkColl();
+
+        if (jumping)
+            HandleJump();
+
+        if (allowedMovement)
+            movePlayer(directon);
+    }
+
+    void Jump()
+    {
+        if ((Input.GetKeyDown(KeyCode.Space) && grounded) ||
+            (Input.GetKeyDown(KeyCode.Space) &&
+            Time.timeSinceLevelLoad - lastTimeGrounded < delayedJumpTimeAllowance))
         {
-            coyoteTimer = coyoteTime;
+            jumping = true;
+            jumpingStartTime = Time.timeSinceLevelLoad;
+
+            Rigidbody2D rb = GetComponent<Rigidbody2D>();
+            rb.linearVelocity = new Vector2(
+                rb.linearVelocity.x,
+                tapJumpSpeed
+            );
+        }
+    }
+
+    void CheckDirection()
+    {
+        if (Input.GetKey(KeyCode.A))
+        {
+            directon = -1;
+            facingRight = false;
+            currentlyWalking = true;
+
+            // Flip only the sprite horizontally.
+            if (spriteRenderer != null)
+                spriteRenderer.flipX = true;
+        }
+        else if (Input.GetKey(KeyCode.D))
+        {
+            directon = 1;
+            facingRight = true;
+            currentlyWalking = true;
+
+            // Restore the sprite's original horizontal direction.
+            if (spriteRenderer != null)
+                spriteRenderer.flipX = false;
         }
         else
         {
-            coyoteTimer -= Time.deltaTime;
+            directon = 0;
+            currentlyWalking = false;
         }
+    }
 
-        // Jumping
-        if (Input.GetButtonDown("Jump") && coyoteTimer > 0f)
+    void movePlayer(int direction)
+    {
+        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+
+        wantedSpeed = moveSpeed * direction;
+
+        movement = Mathf.Lerp(
+            rb.linearVelocity.x,
+            wantedSpeed,
+            0.1f
+        );
+
+        if (Mathf.Abs(movement) < 0.1f &&
+            !Input.GetKey(KeyCode.D) &&
+            !Input.GetKey(KeyCode.A))
         {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-            coyoteTimer = 0f;
+            movement = 0;
+        }
+
+        rb.linearVelocity = new Vector2(
+            movement,
+            rb.linearVelocity.y
+        );
+    }
+
+    void HandleJump()
+    {
+        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+
+        if (Time.timeSinceLevelLoad - jumpingStartTime < jumpDuration)
+        {
+            jumpVel = Mathf.Lerp(
+                rb.linearVelocity.y,
+                jumpSpeed,
+                accel
+            );
+
+            rb.linearVelocity = new Vector2(
+                rb.linearVelocity.x,
+                jumpVel
+            );
+
+            if (Time.timeSinceLevelLoad - jumpingStartTime >= minJumpTime)
+            {
+                if (!Input.GetKey(KeyCode.Space))
+                    jumping = false;
+            }
+        }
+        else
+        {
+            jumping = false;
         }
     }
 
-    Vector2 GetFeetPosition()
+    void checkColl()
     {
-        if (groundCheckPoint != null)
-            return groundCheckPoint.position;
-        if (col != null)
-            return new Vector2(col.bounds.center.x, col.bounds.min.y);
-        return transform.position;
-    }
+        RaycastHit2D boxDown = Physics2D.BoxCast(
+            transform.position,
+            groundBoxSize,
+            0f,
+            Vector2.down,
+            checkGroundRayLength,
+            Floor | cloudLayer
+        );
 
-    void CheckGrounded()
-    {
-        Vector2 origin = GetFeetPosition();
+        if (boxDown.collider != null || touchingCloud)
+        {
+            grounded = true;
+            wasGrounded = true;
+        }
+        else
+        {
+            grounded = false;
+        }
 
-        RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, groundCheckDistance, groundLayer | cloudLayer);
-        isGrounded = hit.collider != null;
-
-        // Debug.DrawRay(origin, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
+        if (!grounded && wasGrounded)
+        {
+            lastTimeGrounded = Time.timeSinceLevelLoad;
+            wasGrounded = false;
+        }
     }
 
     // ---------------- Cloud detection ----------------
 
+    Vector2 GetFeetPosition()
+    {
+        if (col != null)
+            return new Vector2(col.bounds.center.x, col.bounds.min.y);
+
+        return transform.position;
+    }
+
     void CheckCloudContact()
     {
-        // Only the player's main collider is tested, so the Leaf Collider child is ignored.
+        if (col == null)
+            return;
+
         int count = col.Overlap(cloudFilter, overlapResults);
 
         bool nowTouching = false;
@@ -118,7 +247,8 @@ public class PlayerMovement : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            if (overlapResults[i].CompareTag("Cloud"))
+            if (overlapResults[i] != null &&
+                overlapResults[i].CompareTag("Cloud"))
             {
                 nowTouching = true;
                 cloudCollider = overlapResults[i];
@@ -136,23 +266,32 @@ public class PlayerMovement : MonoBehaviour
 
     void OnCloudEnter(Collider2D cloud)
     {
-        CancelInvoke("ChangeToDefaultGravity");
+        CancelInvoke(nameof(ChangeToDefaultGravity));
         Physics2D.gravity = new Vector2(0f, -3f);
 
         if (triangleRoutine == null)
         {
-            SpriteRenderer cloudSR = cloud.GetComponentInChildren<SpriteRenderer>();
-            Material cloudMat = cloudSR != null ? cloudSR.sharedMaterial : null;
-            int layerID = cloudSR != null ? cloudSR.sortingLayerID : 0;
-            int order = cloudSR != null ? cloudSR.sortingOrder : 0;
+            SpriteRenderer cloudSR =
+                cloud.GetComponentInChildren<SpriteRenderer>();
 
-            triangleRoutine = StartCoroutine(SpawnTriangles(cloudMat, layerID, order));
+            Material cloudMat =
+                cloudSR != null ? cloudSR.sharedMaterial : null;
+
+            int layerID =
+                cloudSR != null ? cloudSR.sortingLayerID : 0;
+
+            int order =
+                cloudSR != null ? cloudSR.sortingOrder : 0;
+
+            triangleRoutine = StartCoroutine(
+                SpawnTriangles(cloudMat, layerID, order)
+            );
         }
     }
 
     void OnCloudExit()
     {
-        Invoke("ChangeToDefaultGravity", 0.2f);
+        Invoke(nameof(ChangeToDefaultGravity), 0.2f);
 
         if (triangleRoutine != null)
         {
@@ -168,7 +307,10 @@ public class PlayerMovement : MonoBehaviour
 
     // ---------------- Cloud triangles ----------------
 
-    IEnumerator SpawnTriangles(Material mat, int sortingLayerID, int sortingOrder)
+    IEnumerator SpawnTriangles(
+        Material mat,
+        int sortingLayerID,
+        int sortingOrder)
     {
         while (true)
         {
@@ -177,9 +319,13 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    void SpawnTriangle(Material mat, int sortingLayerID, int sortingOrder)
+    void SpawnTriangle(
+        Material mat,
+        int sortingLayerID,
+        int sortingOrder)
     {
         Vector2 feet = GetFeetPosition();
+
         Vector2 spawnPos = new Vector2(
             feet.x + Random.Range(-spawnSpread, spawnSpread),
             feet.y - 0.1f
@@ -190,19 +336,23 @@ public class PlayerMovement : MonoBehaviour
 
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = GetTriangleSprite();
-        if (mat != null) sr.sharedMaterial = mat;   // same material as the cloud
+
+        if (mat != null)
+            sr.sharedMaterial = mat;
+
         sr.color = triangleColor;
         sr.sortingLayerID = sortingLayerID;
         sr.sortingOrder = sortingOrder + 1;
 
-        // Sprite is 1 unit wide at scale 1, so scale it to the desired size
         go.transform.localScale = Vector3.one * triangleSize;
 
-        // Run on a separate host-independent coroutine owned by this script
         StartCoroutine(AnimateTriangle(go, sr, spawnPos));
     }
 
-    IEnumerator AnimateTriangle(GameObject go, SpriteRenderer sr, Vector2 startPos)
+    IEnumerator AnimateTriangle(
+        GameObject go,
+        SpriteRenderer sr,
+        Vector2 startPos)
     {
         float phase = Random.Range(0f, Mathf.PI * 2f);
         float t = 0f;
@@ -211,10 +361,16 @@ public class PlayerMovement : MonoBehaviour
         {
             float normalized = t / triangleLifetime;
 
-            float wiggleX = Mathf.Sin(t * wiggleSpeed + phase) * wiggleAmount;
+            float wiggleX =
+                Mathf.Sin(t * wiggleSpeed + phase) * wiggleAmount;
+
             float fallY = -triangleFallDistance * normalized;
 
-            go.transform.position = new Vector3(startPos.x + wiggleX, startPos.y + fallY, 0f);
+            go.transform.position = new Vector3(
+                startPos.x + wiggleX,
+                startPos.y + fallY,
+                0f
+            );
 
             Color c = triangleColor;
             c.a = Mathf.Lerp(triangleColor.a, 0f, normalized);
@@ -224,16 +380,24 @@ public class PlayerMovement : MonoBehaviour
             yield return null;
         }
 
-        if (go != null) Destroy(go);
+        if (go != null)
+            Destroy(go);
     }
 
-    // Builds a downward-pointing triangle sprite (apex at the bottom, like an "arrow down")
     static Sprite GetTriangleSprite()
     {
-        if (triangleSprite != null) return triangleSprite;
+        if (triangleSprite != null)
+            return triangleSprite;
 
         const int size = 64;
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+
+        Texture2D tex = new Texture2D(
+            size,
+            size,
+            TextureFormat.RGBA32,
+            false
+        );
+
         tex.filterMode = FilterMode.Bilinear;
         tex.wrapMode = TextureWrapMode.Clamp;
 
@@ -242,20 +406,50 @@ public class PlayerMovement : MonoBehaviour
 
         for (int y = 0; y < size; y++)
         {
-            // y = 0 is the bottom row (apex), y = size-1 is the top row (widest)
-            float halfWidth = (y / (float)(size - 1)) * (size * 0.5f);
+            float halfWidth =
+                (y / (float)(size - 1)) * (size * 0.5f);
 
             for (int x = 0; x < size; x++)
             {
                 bool inside = Mathf.Abs(x - center) <= halfWidth;
-                tex.SetPixel(x, y, inside ? Color.white : clear);
+
+                tex.SetPixel(
+                    x,
+                    y,
+                    inside ? Color.white : clear
+                );
             }
         }
 
         tex.Apply();
 
-        // pixelsPerUnit = size, so the sprite is exactly 1 unit wide at scale 1
-        triangleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        triangleSprite = Sprite.Create(
+            tex,
+            new Rect(0, 0, size, size),
+            new Vector2(0.5f, 0.5f),
+            size
+        );
+
         return triangleSprite;
+    }
+
+    void OnDrawGizmos()
+    {
+        Vector3 start = transform.position;
+
+        Vector3 end =
+            start + Vector3.down * checkGroundRayLength;
+
+        Vector3 size = new Vector3(
+            groundBoxSize.x,
+            groundBoxSize.y,
+            0f
+        );
+
+        Gizmos.color = grounded ? Color.green : Color.red;
+
+        Gizmos.DrawWireCube(start, size);
+        Gizmos.DrawWireCube(end, size);
+        Gizmos.DrawLine(start, end);
     }
 }
