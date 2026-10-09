@@ -30,7 +30,10 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] float jumpDuration;
     [SerializeField] float maxJump;
     public bool jumping;
-    public bool grounded;
+    public bool jumpStarted; // set when a jump begins; read and cleared by the animation manager
+    public bool grounded;    // floor OR cloud
+    public bool onFloor;     // true only when standing on the Floor layer (clouds don't count)
+    public bool TouchingCloud => touchingCloud;
     float jumpingStartTime;
     float jumpVel;
 
@@ -52,6 +55,16 @@ public class PlayerMovement : MonoBehaviour
     public float wiggleAmount = 0.08f;
     public float wiggleSpeed = 40f;
     public float spawnSpread = 0.3f;
+
+    [Header("Jump Particles")]
+    public Color jumpParticleColor = new Color(1f, 0.15f, 0.15f, 1f);
+    public int jumpParticleCount = 8;
+    public float jumpParticleSize = 0.12f;
+    public float jumpParticleLifetime = 0.4f;
+    public float jumpParticleSpeed = 2f;
+    public float jumpParticleGravity = 6f;
+
+    static Sprite circleSprite;
 
     Collider2D col;
     bool touchingCloud;
@@ -104,6 +117,8 @@ public class PlayerMovement : MonoBehaviour
             Time.timeSinceLevelLoad - lastTimeGrounded < delayedJumpTimeAllowance))
         {
             jumping = true;
+            jumpStarted = true;
+            SpawnJumpParticles();
             jumpingStartTime = Time.timeSinceLevelLoad;
 
             Rigidbody2D rb = GetComponent<Rigidbody2D>();
@@ -199,6 +214,18 @@ public class PlayerMovement : MonoBehaviour
 
     void checkColl()
     {
+        // Floor only (clouds don't count)
+        RaycastHit2D floorDown = Physics2D.BoxCast(
+            transform.position,
+            groundBoxSize,
+            0f,
+            Vector2.down,
+            checkGroundRayLength,
+            Floor
+        );
+        onFloor = floorDown.collider != null;
+
+        // Floor or cloud
         RaycastHit2D boxDown = Physics2D.BoxCast(
             transform.position,
             groundBoxSize,
@@ -314,7 +341,10 @@ public class PlayerMovement : MonoBehaviour
     {
         while (true)
         {
-            SpawnTriangle(mat, sortingLayerID, sortingOrder);
+            // Only spawn while the player is off the floor
+            if (!onFloor)
+                SpawnTriangle(mat, sortingLayerID, sortingOrder);
+
             yield return new WaitForSeconds(spawnInterval);
         }
     }
@@ -431,6 +461,106 @@ public class PlayerMovement : MonoBehaviour
         );
 
         return triangleSprite;
+    }
+
+    // ---------------- Jump particles ----------------
+
+    void SpawnJumpParticles()
+    {
+        Vector2 feet = GetFeetPosition();
+
+        int layerID = spriteRenderer != null ? spriteRenderer.sortingLayerID : 0;
+        int order = spriteRenderer != null ? spriteRenderer.sortingOrder : 0;
+
+        for (int i = 0; i < jumpParticleCount; i++)
+        {
+            GameObject go = new GameObject("JumpParticle");
+            go.transform.position = new Vector3(
+                feet.x + Random.Range(-0.15f, 0.15f),
+                feet.y,
+                0f
+            );
+
+            SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = GetCircleSprite();
+            sr.color = jumpParticleColor;
+            sr.sortingLayerID = layerID;
+            sr.sortingOrder = order + 1;
+
+            float size = jumpParticleSize * Random.Range(0.7f, 1.3f);
+            go.transform.localScale = Vector3.one * size;
+
+            // Mostly sideways, slightly upward
+            float dir = Random.value < 0.5f ? -1f : 1f;
+            Vector2 vel = new Vector2(
+                dir * Random.Range(0.3f, 1f) * jumpParticleSpeed,
+                Random.Range(0.2f, 1f) * jumpParticleSpeed * 0.6f
+            );
+
+            StartCoroutine(AnimateJumpParticle(go, sr, vel));
+        }
+    }
+
+    IEnumerator AnimateJumpParticle(
+        GameObject go,
+        SpriteRenderer sr,
+        Vector2 vel)
+    {
+        float t = 0f;
+
+        while (t < jumpParticleLifetime && go != null)
+        {
+            float normalized = t / jumpParticleLifetime;
+
+            vel.y -= jumpParticleGravity * Time.deltaTime;
+            go.transform.position += (Vector3)(vel * Time.deltaTime);
+
+            Color c = jumpParticleColor;
+            c.a = Mathf.Lerp(jumpParticleColor.a, 0f, normalized);
+            sr.color = c;
+
+            t += Time.deltaTime;
+            yield return null;
+        }
+
+        if (go != null)
+            Destroy(go);
+    }
+
+    static Sprite GetCircleSprite()
+    {
+        if (circleSprite != null)
+            return circleSprite;
+
+        const int size = 32;
+
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Clamp;
+
+        Color clear = new Color(1f, 1f, 1f, 0f);
+        float center = (size - 1) * 0.5f;
+        float radius = size * 0.5f - 1f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                tex.SetPixel(x, y, d <= radius ? Color.white : clear);
+            }
+        }
+
+        tex.Apply();
+
+        circleSprite = Sprite.Create(
+            tex,
+            new Rect(0, 0, size, size),
+            new Vector2(0.5f, 0.5f),
+            size
+        );
+
+        return circleSprite;
     }
 
     void OnDrawGizmos()

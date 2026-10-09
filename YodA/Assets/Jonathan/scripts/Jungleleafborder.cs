@@ -44,7 +44,8 @@ public class JungleLeafBorder : MonoBehaviour
     [Range(0f, 1f)] public float veinDarkness = 0.45f;
 
     [Header("Sorting")]
-    public bool drawBehindObject = false;
+    [Tooltip("Tick to draw leaves in front of the parent. Unticked (default) = behind it.")]
+    public bool drawInFront = false;
     public int sortingOffset = 1;
 
     [Header("Sway (idle)")]
@@ -205,10 +206,11 @@ public class JungleLeafBorder : MonoBehaviour
 
         Sprite leafSprite = GetLeafSprite();
 
-        SpriteRenderer parentSr = GetComponent<SpriteRenderer>();
-        int baseOrder = parentSr != null ? parentSr.sortingOrder : 0;
-        int layerId = parentSr != null ? parentSr.sortingLayerID : 0;
-        int order = drawBehindObject ? baseOrder - sortingOffset : baseOrder + sortingOffset;
+        // Works with SpriteRenderer, TilemapRenderer, SpriteShapeRenderer, etc.
+        Renderer parentR = FindParentRenderer();
+        int baseOrder = parentR != null ? parentR.sortingOrder : 0;
+        int layerId = parentR != null ? parentR.sortingLayerID : 0;
+        int order = drawInFront ? baseOrder + sortingOffset : baseOrder - sortingOffset;
 
         // Each side: start point, end point (local space), outward angle (0 = up, +CCW)
         if (top) BuildSide(container, leafSprite, new Vector2(r.xMin, r.yMax), new Vector2(r.xMax, r.yMax), 0f, sx, sy, order, layerId);
@@ -264,7 +266,11 @@ public class JungleLeafBorder : MonoBehaviour
             sr.sprite = sprite;
             sr.color = baseColor;
             sr.sortingLayerID = layerId;
-            sr.sortingOrder = order + Random.Range(0, 3);
+
+            // Jitter stays on the correct side of the parent
+            int jitter = Random.Range(0, 3);
+            sr.sortingOrder = drawInFront ? order + jitter : order - jitter;
+
             if (leafMaterial != null) sr.sharedMaterial = leafMaterial;
 
             int index = leaves.Count;
@@ -298,6 +304,21 @@ public class JungleLeafBorder : MonoBehaviour
                 speed = Random.Range(0.7f, 1.3f)
             });
         }
+    }
+
+    Renderer FindParentRenderer()
+    {
+        Renderer r = GetComponent<Renderer>();
+        if (r != null) return r;
+
+        // Fallback: a renderer on a child (skip our own leaves)
+        foreach (Renderer child in GetComponentsInChildren<Renderer>())
+        {
+            if (child.gameObject.name == "Leaf") continue;
+            if (child.transform.parent != null && child.transform.parent.name.StartsWith(ContainerName)) continue;
+            return child;
+        }
+        return null;
     }
 
     Rect GetLocalRect()
