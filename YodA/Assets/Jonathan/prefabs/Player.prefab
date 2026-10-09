@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 468982290343089370}
   - component: {fileID: 6938599188068796519}
   - component: {fileID: 1474125767855430723}
+  - component: {fileID: 1957965936083827758}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -60,7 +61,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 902678e8de4cdc74aa17d0a415c31642, type: 2}
+  - {fileID: 2100000, guid: 0c660e5b25bc84b408fc5dbd7192ceea, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -81,8 +82,8 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -9095717837082945937, guid: 207ee8102dd4143d288186ef0be518ee, type: 3}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Sprite: {fileID: -4680931775007083592, guid: f78b4fc1cd42c244c90b04c14021c9c0, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -153,8 +154,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
-  m_Size: {x: 1, y: 2}
+  m_Offset: {x: 0.09052014, y: -0.35978508}
+  m_Size: {x: 1.0418549, y: 3.1081023}
   m_Direction: 0
 --- !u!114 &6938599188068796519
 MonoBehaviour:
@@ -168,17 +169,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8e894b8d11d1384da5583760b791b50, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 5
-  jumpForce: 8
-  groundLayer:
+  tapJumpSpeed: 5
+  minJumpTime: 0.1
+  checkGroundRayLength: 2.3
+  Floor:
     serializedVersion: 2
     m_Bits: 64
   cloudLayer:
     serializedVersion: 2
     m_Bits: 0
-  groundCheckDistance: 0.15
-  groundCheckPoint: {fileID: 0}
-  coyoteTime: 0.1
+  moveSpeed: 5
+  maxSpeed: 10
+  wantedSpeed: 0
+  movement: 0
+  currentlyWalking: 0
+  facingRight: 1
+  spriteRenderer: {fileID: 0}
+  jumpSpeed: 9
+  jumpDuration: 0.3
+  maxJump: 10
+  jumping: 0
+  jumpStarted: 0
+  grounded: 0
+  onFloor: 0
+  delayedJumpTimeAllowance: 0.1
+  allowedMovement: 1
   triangleColor: {r: 0.6, g: 0.85, b: 1, a: 1}
   triangleSize: 0.3
   spawnInterval: 0.08
@@ -187,6 +202,12 @@ MonoBehaviour:
   wiggleAmount: 0.08
   wiggleSpeed: 40
   spawnSpread: 0.3
+  jumpParticleColor: {r: 1, g: 0.15, b: 0.15, a: 1}
+  jumpParticleCount: 8
+  jumpParticleSize: 0.12
+  jumpParticleLifetime: 0.4
+  jumpParticleSpeed: 2
+  jumpParticleGravity: 6
 --- !u!95 &1474125767855430723
 Animator:
   serializedVersion: 7
@@ -209,6 +230,23 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1957965936083827758
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 531322699926824502}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad96ac782c5681a44a21241ea8fc301c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  idle: idle
+  walk: walk
+  jump: 
+  startJump: jump start
+  midAir: mid air
 --- !u!1 &7881307438857276960
 GameObject:
   m_ObjectHideFlags: 0
