@@ -41,5 +41,6 @@ public class UnChildOnTrigger : MonoBehaviour
         );
 
         hasDetached = true;
+
     }
 }
