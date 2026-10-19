@@ -36,11 +36,13 @@ public class GameManager : MonoBehaviour
     private int dropsUsed = 0;
     private FallingBox activeFallingBox; // only one box in flight at a time
 
+
+
+
     [Header("Player")]
     public GameObject playerObject;
     public float switchDelay = 0.3f; // small pause after the 3rd box lands
 
-    public GrowReveal tree;      // drag the tree object here in the Inspector
 
 
     void Start()
@@ -107,7 +109,6 @@ public class GameManager : MonoBehaviour
 
         if (dropsUsed >= dropsAllowed)
         {
-            if (tree != null) tree.Play();   // third box landed -> start the tree growing
             Invoke(nameof(SwitchToMovePhase), switchDelay);
         }
     }

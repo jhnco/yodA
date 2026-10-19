@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 224343361084954706}
   - component: {fileID: 7520234954183500657}
   - component: {fileID: 117179534735037835}
+  - component: {fileID: 3057147887198458667}
   m_Layer: 6
   m_Name: box
   m_TagString: Floor
@@ -58,7 +59,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: dd73629b79a54bd4fa1b1932e83c877e, type: 2}
+  - {fileID: 2100000, guid: 0c660e5b25bc84b408fc5dbd7192ceea, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -176,3 +177,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   manager: {fileID: 0}
+--- !u!114 &3057147887198458667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5052665890574890880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed72d3fe603aff24681c200b5cc3e3fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
