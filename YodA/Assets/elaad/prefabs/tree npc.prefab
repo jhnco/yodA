@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 3224883206308144931}
   - component: {fileID: 6731154086932029219}
   - component: {fileID: 4347216663727629715}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: tree npc
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -27,8 +27,8 @@ Transform:
   m_GameObject: {fileID: 7490347637049681040}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 15.43, y: -0.38, z: 0}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  m_LocalPosition: {x: 15.43, y: -0.66, z: 0}
+  m_LocalScale: {x: 0.09, y: 0.09, z: 0.09}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
@@ -76,8 +76,8 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Sprite: {fileID: 1939523377174761605, guid: 361fdad76eb0f0f44b3f3bc049023326, type: 3}
+  m_SortingOrder: -2
+  m_Sprite: {fileID: 8795424368369517486, guid: 7c089396d90450c42a58e07ffd8051a7, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -98,7 +98,7 @@ Animator:
   m_GameObject: {fileID: 7490347637049681040}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 9b65166eee3401c439e8aa570e3e12b0, type: 2}
+  m_Controller: {fileID: 9100000, guid: 7b18d80d4257b62478b4deaf88535cd0, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
