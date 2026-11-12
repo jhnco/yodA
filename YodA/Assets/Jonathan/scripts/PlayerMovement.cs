@@ -44,6 +44,9 @@ public class PlayerMovement : MonoBehaviour
 
     public bool allowedMovement = true;
 
+    [Tooltip("When false, the player can't walk, jump or turn around at all.")]
+    public bool canMove = true;
+
     Vector2 groundBoxSize = new Vector2(0.4f, 0.5f);
 
     [Header("Cloud Triangles")]
@@ -90,18 +93,56 @@ public class PlayerMovement : MonoBehaviour
         cloudFilter.useTriggers = true;
     }
 
+    // ---------------- canMove control ----------------
+
+    /// <summary>Sets whether the player can move. When false, all movement input is ignored.</summary>
+    public void SetCanMove(bool value)
+    {
+        canMove = value;
+
+        if (!canMove)
+            StopMovement();
+    }
+
+    public void EnableMovement() => SetCanMove(true);
+    public void DisableMovement() => SetCanMove(false);
+
+    public bool CanMove => canMove;
+
+    void StopMovement()
+    {
+        directon = 0;
+        movement = 0f;
+        wantedSpeed = 0f;
+        currentlyWalking = false;
+        jumping = false;
+
+        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+        if (rb != null)
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+    }
+
     void Update()
     {
         CheckCloudContact();
         CheckDirection();
 
-        if (allowedMovement)
+        if (allowedMovement && canMove)
             Jump();
     }
 
     void FixedUpdate()
     {
         checkColl();
+
+        if (!canMove)
+        {
+            // Keep horizontal velocity at zero (gravity still applies so the player doesn't hover)
+            Rigidbody2D rbStopped = GetComponent<Rigidbody2D>();
+            if (rbStopped != null)
+                rbStopped.linearVelocity = new Vector2(0f, rbStopped.linearVelocity.y);
+            return;
+        }
 
         if (jumping)
             HandleJump();
@@ -131,6 +172,13 @@ public class PlayerMovement : MonoBehaviour
 
     void CheckDirection()
     {
+        if (!canMove)
+        {
+            directon = 0;
+            currentlyWalking = false;
+            return; // no input, no turning around
+        }
+
         if (Input.GetKey(KeyCode.A))
         {
             directon = -1;
