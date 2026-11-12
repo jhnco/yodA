@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using static UnityEditor.Experimental.GraphView.GraphView;
 
 public class RidesManager : MonoBehaviour
 {
@@ -74,6 +73,7 @@ public class RidesManager : MonoBehaviour
                 TreeCollManager.numDestroyed++;
                 RidesToText[name].text = "";
                 DestRidesToText[name].text = "";
+                isDestroyed = true;
             }
         }
     }
