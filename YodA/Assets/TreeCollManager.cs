@@ -13,7 +13,7 @@ public class TreeCollManager : MonoBehaviour
     [Tooltip("How many times bigger the text gets when enlarged (1 = no change).")]
     [SerializeField] float zoomedTextMultiplier = 1.5f;
 
-    int collCount = 0;
+    public bool firstTalkHappened = false;
 
     float normalFontSize;
     float textScale = 1f;       // current multiplier applied to the font size
@@ -45,14 +45,11 @@ public class TreeCollManager : MonoBehaviour
     {
         if (other.gameObject.tag == "Player")
         {
-            collCount++;
-        }
-
-        switch (collCount)
-        {
-            case 1:
+            if(!firstTalkHappened)
+            {
+                firstTalkHappened = true;
                 StartCoroutine(FirstTalk());
-                break;
+            }
         }
     }
 
@@ -63,7 +60,7 @@ public class TreeCollManager : MonoBehaviour
         InlargeTextSize();
         speechText.text = "My goodness a person! No one has come here in ages!";
         yield return new WaitForSeconds(4);
-        speechText.text = "Please, Go on a ride, I'll give you my most special Leaf.";
+        speechText.text = "Please, Go on a ride, I'll give you my most special leaf.";
         yield return new WaitForSeconds(5);
         speechText.text = "";
         ReduceTextSize();
