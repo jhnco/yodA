@@ -14,6 +14,8 @@ public class UnChildOnTrigger : MonoBehaviour
     private bool hasDetached = false;
     private Collider2D triggerCollider;
 
+    [SerializeField] GameObject TurnToCollider;
+
     private void Awake()
     {
         triggerCollider = GetComponent<Collider2D>();
@@ -41,6 +43,8 @@ public class UnChildOnTrigger : MonoBehaviour
         );
 
         hasDetached = true;
+
+        TurnToCollider.GetComponent<Collider2D>().isTrigger = false;
 
     }
 }
